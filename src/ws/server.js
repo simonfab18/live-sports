@@ -15,28 +15,45 @@ function broadcast(wss, payload){
     }
 }
 
+function rejectUpgrade(socket, statusCode, statusText, reason) {
+    socket.write(
+        `HTTP/1.1 ${statusCode} ${statusText}\r\n` +
+        'Connection: close\r\n' +
+        'Content-Type: text/plain\r\n' +
+        `\r\n${reason}`
+    );
+    socket.destroy();
+}
+
 export function attachWebSocketServer(server) {
-    const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1024 * 1024 });
+    const wss = new WebSocketServer({ noServer: true, path: '/ws', maxPayload: 1024 * 1024 });
 
-    wss.on('connection', async (socket, req) => {
-        if(wsArcjet) {
+    server.on('upgrade', async (req, socket, head) => {
+        if (!wss.shouldHandle(req)) return;
+
+        if (wsArcjet) {
             try {
-                const decision = await wsArcjet.protect(req)
+                const decision = await wsArcjet.protect(req);
 
-                if(decision.isDenied()){
-                    const code = decision.reason.isRateLimit() ? 1013 : 1008;
-                    const reason = decision.reason.isRateLimit() ? 'Rate Limit exceeded' : 'Access Denied';
-
-                    socket.close(code, reason);
+                if (decision.isDenied()) {
+                    if (decision.reason.isRateLimit()) {
+                        rejectUpgrade(socket, 429, 'Too Many Requests', 'Rate Limit exceeded');
+                    } else {
+                        rejectUpgrade(socket, 403, 'Forbidden', 'Access Denied');
+                    }
                     return;
                 }
             } catch (e) {
                 console.error('WS connection error', e);
-                socket.close(1011, 'Server Security Error');
+                socket.destroy();
                 return;
             }
         }
 
+        wss.handleUpgrade(req, socket, head, (ws) => {
+            wss.emit('connection', ws, req);
+        });
+    });
 
     wss.on('connection', (socket) => {
         socket.isAlive = true;
