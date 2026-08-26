@@ -13,7 +13,7 @@ matchRouter.get('/', async (req, res) => {
     const parsed = listMatchesQuerySchema.safeParse(req.query);
 
     if (!parsed.success)  {
-        return res.status(400).json({ message: 'Invalid query.', details: parsed.error.issues() });
+        return res.status(400).json({ message: 'Invalid query.', details: parsed.error.issues });
 
     }
 
@@ -36,7 +36,7 @@ matchRouter.post('/', async (req, res) => {
     const parsed = createMatchSchema.safeParse(req.body);
 
     if (!parsed.success) {
-        return res.status(400).json({ message: 'Invalid payload.', details: parsed.error.issues() });
+        return res.status(400).json({ message: 'Invalid payload.', details: parsed.error.issues });
     }
 
 
@@ -51,6 +51,10 @@ matchRouter.post('/', async (req, res) => {
             awayScore: awayScore ?? 0,
             status: getMatchStatus(startTime, endTime),
         }).returning();
+
+        if(res.app.locals.broadcastMatchCreated) {
+            res.app.locals.broadcastMatchCreated(event);
+        }
 
         res.status(201).json({ data: event })
     } catch (e) {
