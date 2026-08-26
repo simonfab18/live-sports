@@ -38,6 +38,7 @@ export function attachWebSocketServer(server) {
         }
 
 
+    wss.on('connection', (socket) => {
         socket.isAlive = true;
         socket.on('pong', () => {socket.isAlive = true; });
 
