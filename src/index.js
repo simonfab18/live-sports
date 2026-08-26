@@ -1,17 +1,31 @@
 import express from 'express';
+import http from 'http';
 import {matchRouter} from "./routes/matches.js";
+import {attachWebSocketServer} from "./ws/server.js";
+import {securityMiddleware} from "../arcjet.js";
+
+const PORT = Number(process.env.PORT) || 8000;
+const HOST = process.env.HOST || 8000;
 
 const app = express();
-const PORT = 8000;
+const server = http.createServer(app);
 
 app.use(express.json());
 
 app.get('/', (req, res) => {
-  res.send({ message: 'Welcome to Livesports API' });
+  res.send('Hello from Express server!' );
 });
 
-app.use('/matches', matchRouter)
+app.use(securityMiddleware());
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+app.use('/matches', matchRouter);
+
+const { broadcastMatchCreated } = attachWebSocketServer(server);
+app.locals.broadcastMatchCreated = broadcastMatchCreated;
+
+server.listen(PORT, HOST,() => {
+  const baseURl = HOST === '0.0.0.0' ? `http://localhost:${PORT}` : `http://${HOST}:${PORT}`;
+
+  console.log(`Server running on ${ baseURl }`);
+  console.log(`WebSocket Server is running on ${baseURl.replace('http', 'ws')}/ws`);
 });
